@@ -1,0 +1,39 @@
+{% load wagtailadmin_tags %}
+<form method="post" action="" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="messages">
+      <div class="help-block help-warning">
+        {{ form.non_field_errors }}
+      </div>
+    </div>
+  {% endif %}
+
+  <ul class="fields">
+    <li class="full">
+      {% include "wagtailadmin/shared/field.html" with field=form.user_name label="Nama" %}
+    </li>
+    <li class="half">
+      {% include "wagtailadmin/shared/field.html" with field=form.user_email label="Email" %}
+    </li>
+    <li class="half">
+      {% include "wagtailadmin/shared/field.html" with field=form.user_url label="URL" %}
+    </li>
+    <li class="full">
+      {% include "wagtailadmin/shared/field.html" with field=form.comment label="Komentar" %}
+    </li>
+    <li class="half">
+      {% include "wagtailadmin/shared/field.html" with field=form.is_public label="Publik" %}
+    </li>
+    <li class="half">
+      {% include "wagtailadmin/shared/field.html" with field=form.is_removed label="Dihapus" %}
+    </li>
+  </ul>
+
+  <footer class="footer">
+    <div class="buttons">
+      <button type="submit" class="button button-primary">Simpan</button>
+      <button type="button" class="button button-secondary close-modal">Batal</button>
+    </div>
+  </footer>
+</form>

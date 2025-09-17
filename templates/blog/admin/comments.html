@@ -1,0 +1,323 @@
+{% extends "wagtailadmin/base.html" %}
+{% load wagtailadmin_tags %}
+
+{% block titletag %}{{ title }}{% endblock %}
+
+{% block content %}
+    <header class="header">
+        <div class="row">
+            <div class="left">
+                <div class="col">
+                    <h1 class="icon icon-comment">{{ title }}</h1>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="nice-padding">
+        {% if comments %}
+            <div class="listing">
+                <table class="listing">
+                    <thead>
+                        <tr>
+                            <th>Artikel</th>
+                            <th>Komentator</th>
+                            <th>Komentar</th>
+                            <th>Tanggal</th>
+                            <th>Status</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comment in comments %}
+                            <tr>
+                                <td>
+                                    <strong>{{ comment.content_object.title|default:"Unknown" }}</strong>
+                                </td>
+                                <td>
+                                    {{ comment.user_name|default:comment.user.get_full_name|default:"Anonymous" }}
+                                    <br>
+                                    <small class="help">{{ comment.user_email }}</small>
+                                </td>
+                                <td>
+                                    <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                        {{ comment.comment|truncatewords:20 }}
+                                    </div>
+                                </td>
+                                <td>
+                                    {{ comment.submit_date|date:"d M Y H:i" }}
+                                </td>
+                                <td>
+                                    {% if comment.is_public %}
+                                        <span class="status-tag primary">Publik</span>
+                                    {% else %}
+                                        <span class="status-tag">Pending</span>
+                                    {% endif %}
+                                    
+                                    {% if comment.is_removed %}
+                                        <span class="status-tag warning">Dihapus</span>
+                                    {% endif %}
+                                </td>
+                                <td class="align-center">
+                                    <div class="actions actions--center">
+                                        <div class="dropdown" data-row-id="row-{{ comment.pk }}">
+                                            <button type="button" class="button button-small dropdown__toggle">
+                                                Aksi ▾
+                                            </button>
+                                            <div class="dropdown__menu" hidden>
+                                                {% if comment.content_object %}
+                                                    <a href="{{ comment.content_object.url }}" class="dropdown__item" target="_blank">Lihat Post</a>
+                                                {% endif %}
+                                                <button type="button"
+                                                        class="dropdown__item action-edit"
+                                                        data-edit-url="{% url 'blog_comment_edit' comment.pk %}"
+                                                        data-row-id="row-{{ comment.pk }}">
+                                                    Edit
+                                                </button>
+                                                <button type="button"
+                                                        class="dropdown__item action-toggle-public"
+                                                        data-url="{% url 'blog_comment_toggle_public' comment.pk %}"
+                                                        data-row-id="row-{{ comment.pk }}">
+                                                    {% if comment.is_public %}Unpublish{% else %}Publish{% endif %}
+                                                </button>
+                                                <button type="button"
+                                                        class="dropdown__item action-toggle-removed"
+                                                        data-url="{% url 'blog_comment_toggle_removed' comment.pk %}"
+                                                        data-row-id="row-{{ comment.pk }}">
+                                                    {% if comment.is_removed %}Restore{% else %}Remove{% endif %}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="help-block help-info">
+                <h2>Belum ada komentar</h2>
+                <p>Komentar yang dikirim pada blog post akan muncul di sini.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Modal container -->
+    <div id="comment-modal" class="modal" hidden>
+        <div class="modal__dialog">
+            <div class="modal__header">
+                <h2 class="icon icon-edit">Edit Komentar</h2>
+                <button type="button" class="button button-secondary button--icon close-modal" aria-label="Close">
+                    <span class="icon icon-cross"></span>
+                </button>
+            </div>
+            <div class="modal__content" id="comment-modal-content">
+                <!-- form will be loaded here via AJAX -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const modal = document.getElementById('comment-modal');
+        const modalContent = document.getElementById('comment-modal-content');
+        const csrftoken = getCookie('csrftoken');
+
+        function openModal() {
+            modal.removeAttribute('hidden');
+            modal.classList.add('is-active');
+        }
+        function closeModal() {
+            modal.classList.remove('is-active');
+            modal.setAttribute('hidden', 'hidden');
+            modalContent.innerHTML = '';
+        }
+
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.action-edit')) {
+                const btn = e.target.closest('.action-edit');
+                const url = btn.getAttribute('data-edit-url');
+                const rowId = btn.getAttribute('data-row-id');
+                fetch(url, { credentials: 'same-origin' })
+                    .then(r => r.text())
+                    .then(html => {
+                        modalContent.innerHTML = html;
+                        // attach submit handler
+                        const form = modalContent.querySelector('form');
+                        if (form) {
+                            form.addEventListener('submit', function(ev) {
+                                ev.preventDefault();
+                                const formData = new FormData(form);
+                                fetch(url, {
+                                    method: 'POST',
+                                    headers: { 'X-CSRFToken': csrftoken },
+                                    body: formData,
+                                    credentials: 'same-origin'
+                                })
+                                .then(resp => {
+                                    if (resp.ok) return resp.json();
+                                    return resp.text().then(html => { throw { html }; });
+                                })
+                                .then(data => {
+                                    // Update the table row values
+                                    const row = document.getElementById(rowId);
+                                    if (row) {
+                                        // Update columns: commenter, text, date, status
+                                        const tds = row.querySelectorAll('td');
+                                        if (tds.length >= 6) {
+                                            tds[1].innerHTML = `${data.user_name || 'Anonymous'}<br><small class="help">${data.user_email || ''}</small>`;
+                                            tds[2].querySelector('div').textContent = data.comment;
+                                            tds[3].textContent = data.submit_date;
+                                            let statusHtml = '';
+                                            statusHtml += data.is_public ? '<span class="status-tag primary">Publik</span>' : '<span class="status-tag">Pending</span>';
+                                            if (data.is_removed) statusHtml += ' <span class="status-tag warning">Dihapus</span>';
+                                            tds[4].innerHTML = statusHtml;
+                                        }
+                                    }
+                                    closeModal();
+                                })
+                                .catch(err => {
+                                    // Re-render form with errors
+                                    if (err.html) {
+                                        modalContent.innerHTML = err.html;
+                                    }
+                                });
+                            });
+                        }
+                        openModal();
+                    });
+            }
+
+            // Dropdown toggle
+            if (e.target.closest('.dropdown__toggle')) {
+                const btn = e.target.closest('.dropdown__toggle');
+                const menu = btn.parentElement.querySelector('.dropdown__menu');
+                if (menu.hasAttribute('hidden')) {
+                    menu.removeAttribute('hidden');
+                } else {
+                    menu.setAttribute('hidden', 'hidden');
+                }
+                return;
+            }
+
+            // Toggle publish/unpublish
+            if (e.target.closest('.action-toggle-public')) {
+                const btn = e.target.closest('.action-toggle-public');
+                const url = btn.getAttribute('data-url');
+                const rowId = btn.getAttribute('data-row-id');
+                btn.disabled = true;
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken },
+                    credentials: 'same-origin'
+                }).then(r => r.json()).then(data => {
+                    const row = document.getElementById(rowId);
+                    if (row) {
+                        const tds = row.querySelectorAll('td');
+                        if (tds.length >= 5) {
+                            let statusHtml = '';
+                            statusHtml += data.is_public ? '<span class="status-tag primary">Publik</span>' : '<span class="status-tag">Pending</span>';
+                            if (data.is_removed) statusHtml += ' <span class="status-tag warning">Dihapus</span>';
+                            tds[4].innerHTML = statusHtml;
+                        }
+                        // Update button label pairs within this row
+                        const pubBtn = row.querySelector('.action-toggle-public');
+                        if (pubBtn) pubBtn.textContent = data.is_public ? 'Unpublish' : 'Publish';
+                        const rmBtn = row.querySelector('.action-toggle-removed');
+                        if (rmBtn) rmBtn.textContent = data.is_removed ? 'Restore' : 'Remove';
+                    }
+                    // Refresh page to reflect freshest data/state from backend
+                    window.location.reload();
+                }).finally(() => { btn.disabled = false; });
+            }
+
+            // Toggle remove/restore
+            if (e.target.closest('.action-toggle-removed')) {
+                const btn = e.target.closest('.action-toggle-removed');
+                const url = btn.getAttribute('data-url');
+                const rowId = btn.getAttribute('data-row-id');
+                btn.disabled = true;
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrftoken },
+                    credentials: 'same-origin'
+                }).then(r => r.json()).then(data => {
+                    const row = document.getElementById(rowId);
+                    if (row) {
+                        const tds = row.querySelectorAll('td');
+                        if (tds.length >= 5) {
+                            let statusHtml = '';
+                            statusHtml += data.is_public ? '<span class="status-tag primary">Publik</span>' : '<span class="status-tag">Pending</span>';
+                            if (data.is_removed) statusHtml += ' <span class="status-tag warning">Dihapus</span>';
+                            tds[4].innerHTML = statusHtml;
+                        }
+                        const pubBtn = row.querySelector('.action-toggle-public');
+                        if (pubBtn) pubBtn.textContent = data.is_public ? 'Unpublish' : 'Publish';
+                        const rmBtn = row.querySelector('.action-toggle-removed');
+                        if (rmBtn) rmBtn.textContent = data.is_removed ? 'Restore' : 'Remove';
+                    }
+                    // Refresh page to reflect freshest data/state from backend
+                    window.location.reload();
+                }).finally(() => { btn.disabled = false; });
+            }
+            if (e.target.closest('.close-modal') || e.target === modal) {
+                closeModal();
+            }
+        });
+    })();
+    </script>
+
+    <style>
+        .align-center { text-align: center; }
+        .actions { display: flex; justify-content: center; }
+        .actions--center { display: inline-block; position: relative; }
+        .dropdown__toggle { min-width: 96px; }
+        .dropdown__menu { position: absolute; right: 0; top: 100%; background: #111827; color: #E5E7EB; border: 1px solid #374151; border-radius: 0.375rem; padding: 0.25rem 0; min-width: 160px; z-index: 50; }
+        .dropdown__item { display: block; width: 100%; text-align: left; background: transparent; color: inherit; padding: 0.5rem 0.75rem; border: 0; cursor: pointer; }
+        .dropdown__item:hover { background: #1f2937; }
+        
+        .status-tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: #f1f5f9;
+            color: #475569;
+            margin-right: 0.25rem;
+        }
+        
+        .status-tag.primary {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-tag.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* Basic modal styling aligned with Wagtail */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+        .modal[hidden] { display: none; }
+        .modal__dialog { background: #fff; width: 720px; max-width: calc(100% - 2rem); border-radius: 6px; overflow: hidden; }
+        .modal__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1rem; border-bottom: 1px solid #e5e7eb; background: #f8fafc; }
+        .modal__content { padding: 1rem; max-height: 70vh; overflow: auto; }
+    </style>
+{% endblock %}

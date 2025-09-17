@@ -1,0 +1,70 @@
+{% extends "base_page.html" %}
+{% load wagtailcore_tags comments comments_xtd %}
+
+{% block content %}
+  <article class="container mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="mx-auto max-w-3xl">
+      <!-- Breadcrumbs -->
+      <nav class="mb-4 text-sm text-grey-400" aria-label="Breadcrumb">
+        <ol class="flex items-center gap-2">
+          <li><a href="/" class="hover:text-primary-500">Home</a></li>
+          <li>/</li>
+          <li><a href="{{ page.get_parent.url }}" class="hover:text-primary-500">{{ page.get_parent.title }}</a></li>
+          <li>/</li>
+          <li aria-current="page" class="text-grey-500">{{ page.title }}</li>
+        </ol>
+      </nav>
+      <header class="mb-6">
+        <h1 class="text-3xl font-semibold tracking-tight text-primary-500">{{ page.title }}</h1>
+        <p class="mt-2 text-sm text-grey-400">{{ page.date|date:"M d, Y" }}</p>
+      </header>
+
+      {% if page.intro %}
+        <p class="mb-6 text-lg text-grey-400">{{ page.intro }}</p>
+      {% endif %}
+
+      <div class="prose prose-neutral dark:prose-invert max-w-none prose-img:w-full prose-figure:w-full prose-iframe:w-full">
+        {{ page.body|richtext }}
+      </div>
+
+      {% if page.tags.all %}
+        <div class="mt-8">
+          <h2 class="text-sm font-semibold text-grey-400 mb-2">Tags</h2>
+          <ul class="flex flex-wrap gap-2">
+            {% for t in page.tags.all %}
+              <li>
+                <a href="{{ page.get_parent.url }}?tag={{ t }}" class="inline-flex items-center px-2 py-1 rounded-md text-xs border border-grey-150 text-grey-400 hover:text-primary-500 hover:border-primary-400">#{{ t }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+    <div class="mt-10">
+      <a href="{{ page.get_parent.url }}" class="g-btn-outline">Kembali ke blog</a>
+    </div>
+
+    {% if page.enable_comments %}
+      <section id="comments" class="mt-12">
+        <div class="g-panel">
+          <h2 class="text-lg font-semibold text-grey-500 mb-4">Komentar</h2>
+
+          <!-- Comment list with threading support -->
+          <div class="space-y-4">
+            {% render_comment_list for page %}
+          </div>
+
+          <!-- Comment form -->
+          <div class="mt-6">
+            <h3 class="text-sm font-medium text-grey-400 mb-2">Tinggalkan komentar</h3>
+            <div class="max-w-2xl">
+              {% render_comment_form for page %}
+            </div>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    </div>
+  </article>
+{% endblock %}
